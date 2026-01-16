@@ -14,27 +14,6 @@ This implementation is based on the IEEE research paper: *"Streaming Intelligenc
 
 ## Architecture
 
-### Streaming Intelligence Framework (SIF) - Five Layer Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                     LAYER 5: ELASTIC ORCHESTRATION & SCALING                     │
-│                        Amazon EKS │ HPA │ KEDA │ Multi-Region                    │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                     LAYER 4: OBSERVABILITY & FEEDBACK                            │
-│              OpenTelemetry │ Prometheus │ Grafana │ OpenSearch │ ELK            │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                     LAYER 3: SECURITY & POLICY ENFORCEMENT                       │
-│                   Zero-Trust │ OPA │ AWS Secrets Manager │ mTLS                  │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                     LAYER 2: LLMOps & COGNITIVE INTELLIGENCE                     │
-│              AWS Bedrock │ Anomaly Detection │ Policy Compliance                 │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                     LAYER 1: DATA INGESTION & STREAM PROCESSING                  │
-│                    Apache Kafka (MSK) │ Apache Spark │ Apache Flink              │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
 ### System Architecture
 
 ```
