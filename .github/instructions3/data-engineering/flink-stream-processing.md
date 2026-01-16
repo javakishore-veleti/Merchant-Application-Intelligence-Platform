@@ -1,95 +1,64 @@
-# Flink Stream Processing
+# Flink Stream Processing - MAIP
 
-## Purpose
-
+## Overview
 Java Flink jobs for real-time event processing, anomaly detection, and complex event processing (CEP).
 
----
-
 ## Location
-
 `backend/data-services/flink-jobs/`
 
----
+## Jobs
 
-## Prerequisites
+| Job | Purpose |
+|-----|---------|
+| StreamProcessor | Main event aggregation and routing |
+| AnomalyDetector | Detect unusual patterns in transactions |
+| CEPProcessor | Complex event pattern matching |
 
-```bash
-# Java 17
-java -version
-
-# Maven 3.9+
-mvn -version
-```
-
----
+## OpenTelemetry
+Service name: `maip-flink-stream-processor`
 
 ## Kafka Topics
 
-### Consumed
+**Consumed:**
+- maip.product.*
+- maip.customer.*
+- maip.application.*
+- maip.order.*
 
-- `maip.product.*`
-- `maip.customer.*`
-- `maip.application.*`
-- `maip.order.*`
+**Produced:**
+- maip.analytics.aggregations
+- maip.anomaly.detected
 
-### Produced
-
-- `maip.analytics.aggregations`
-- `maip.anomaly.detected`
-
----
-
-## Build Commands
+## Build
 
 ```bash
 cd backend/data-services/flink-jobs
-
-# Build JAR
 ./mvnw clean package -DskipTests
 
 # Output: target/maip-stream-processor.jar
 ```
 
----
-
-## Run Locally
-
-### Start Local Flink
+## Run Locally (Docker)
 
 ```bash
+# Start local Flink cluster
 docker-compose -f docker-compose.flink.yaml up -d
-```
 
-### Submit Job
-
-```bash
+# Submit job
 docker exec -it flink-jobmanager flink run \
   /opt/flink/jobs/maip-stream-processor.jar \
   --env local \
   --kafka.bootstrap localhost:9092
 ```
 
-### Check Jobs
-
-```bash
-curl http://localhost:8081/jobs
-```
-
----
-
 ## Run on EMR
 
-### Upload JAR
-
 ```bash
+# Upload JAR to S3
 aws s3 cp target/maip-stream-processor.jar \
   s3://maip-${MAIP_ENV}-artifacts/flink/
-```
 
-### Submit Job
-
-```bash
+# Submit job
 aws emr add-steps --cluster-id $EMR_CLUSTER_ID --steps '[{
   "Name": "MAIP Flink Stream Processor",
   "Type": "Custom",
@@ -104,18 +73,14 @@ aws emr add-steps --cluster-id $EMR_CLUSTER_ID --steps '[{
 }]'
 ```
 
----
-
 ## Code Structure
-
-### Main Class
 
 ```java
 public class StreamProcessor {
     public static void main(String[] args) throws Exception {
-        StreamExecutionEnvironment env = 
-            StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         
+        // Kafka source
         KafkaSource<MaipEvent> source = KafkaSource.<MaipEvent>builder()
             .setBootstrapServers(kafkaBootstrap)
             .setTopics("maip.order.created", "maip.application.submitted")
@@ -123,9 +88,9 @@ public class StreamProcessor {
             .setValueOnlyDeserializer(new MaipEventDeserializer())
             .build();
         
-        DataStream<MaipEvent> events = env.fromSource(
-            source, WatermarkStrategy.noWatermarks(), "Kafka");
+        DataStream<MaipEvent> events = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka");
         
+        // Process and aggregate
         events
             .keyBy(MaipEvent::getCustomerId)
             .window(TumblingEventTimeWindows.of(Time.minutes(5)))
@@ -137,7 +102,7 @@ public class StreamProcessor {
 }
 ```
 
-### CEP Pattern (Anomaly Detection)
+## Anomaly Detection CEP Pattern
 
 ```java
 Pattern<MaipEvent, ?> highVolumePattern = Pattern.<MaipEvent>begin("first")
@@ -149,63 +114,13 @@ CEP.pattern(orderStream, highVolumePattern)
     .select(matches -> new AnomalyEvent("HIGH_ORDER_VOLUME", matches));
 ```
 
----
-
-## Test Commands
-
-```bash
-cd backend/data-services/flink-jobs
-
-# Run tests
-./mvnw test
-
-# Run specific test
-./mvnw test -Dtest=StreamProcessorTest
-```
-
----
-
-## Access Flink UI
-
-### Local
-
-```
-http://localhost:8081
-```
-
-### EMR (via SSH Tunnel)
-
-```bash
-MASTER_DNS=$(aws emr describe-cluster --cluster-id $EMR_CLUSTER_ID \
-  --query 'Cluster.MasterPublicDnsName' --output text)
-
-ssh -i ~/.ssh/maip-emr-key.pem -L 8081:localhost:8081 hadoop@$MASTER_DNS
-# Open http://localhost:8081
-```
-
----
-
-## Common Errors
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `Kafka connection failed` | Wrong brokers | Verify `$MAIP_KAFKA_BROKERS` |
-| `Checkpoint failed` | State backend issue | Check S3 permissions |
-| `Backpressure` | Downstream slow | Scale up parallelism |
-| `OutOfMemoryError` | State too large | Enable RocksDB state backend |
-
----
-
 ## Monitoring
 
-### Check Backpressure
-
 ```bash
-curl http://localhost:8081/jobs/{job-id}/vertices/{vertex-id}/backpressure
-```
+# Flink UI (via SSH tunnel)
+ssh -L 8081:localhost:8081 hadoop@$MASTER_DNS
+# Open http://localhost:8081
 
-### Cancel Job
-
-```bash
-curl -X PATCH http://localhost:8081/jobs/{job-id}?mode=cancel
+# Check running jobs
+curl http://localhost:8081/jobs
 ```
