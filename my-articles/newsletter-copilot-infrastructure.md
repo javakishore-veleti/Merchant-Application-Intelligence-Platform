@@ -18,22 +18,27 @@ Until you teach it.
 
 One of our engineers spent 20 minutes last week trying to figure out the correct AWS CLI command to check MSK consumer lag. The documentation was scattered across Confluence, Slack threads, and someone's personal notes.
 
-Then she tried something different. She added this to our `instructions/aws/msk-kafka-management.md`:
+Then she tried something different. She added this to our `instructions/aws/msk-kafka.md`:
 
 ```markdown
 ## Check Consumer Lag - MAIP Production
 
-maip-prod && kafka-consumer-groups.sh \
-  --bootstrap-server $MAIP_PROD_KAFKA \
-  --describe --group maip-order-service-consumer
+# Step 1: Set AWS profile and environment
+export AWS_PROFILE=maip-prod AWS_REGION=us-east-1 MAIP_ENV=prod
 
-## Environment Variable Setup
-export MAIP_PROD_KAFKA=$(aws kafka get-bootstrap-brokers \
-  --cluster-arn arn:aws:kafka:us-east-1:ACCOUNT:cluster/maip-prod-kafka/xxx \
+# Step 2: Get Kafka broker endpoints
+export MAIP_KAFKA_BROKERS=$(aws kafka get-bootstrap-brokers \
+  --cluster-arn $(aws kafka list-clusters \
+    --query "ClusterInfoList[?ClusterName=='maip-prod-kafka'].ClusterArn" \
+    --output text) \
   --query 'BootstrapBrokerStringSasl' --output text)
+
+# Step 3: Check consumer lag
+kafka-consumer-groups.sh --bootstrap-server $MAIP_KAFKA_BROKERS \
+  --describe --group maip-order-service-consumer
 ```
 
-Next time someone on the team types "check order consumer lag" in their IDE, Copilot generates the exact command. Correct profile. Correct cluster. Correct consumer group name.
+Next time someone on the team types "check order consumer lag in production" in their IDE, Copilot generates the exact commands. Correct profile. Correct cluster. Correct consumer group name.
 
 20 minutes became 10 seconds.
 
@@ -50,14 +55,18 @@ Use kubectl to manage Kubernetes resources.
 ```markdown
 # Scale Order Service During High Load
 
-kubectl scale deployment order-service \
-  -n maip-services --replicas=12
+# First, ensure you're connected to the right cluster
+export AWS_PROFILE=maip-prod AWS_REGION=us-east-1
+aws eks update-kubeconfig --name maip-prod-eks-cluster
+
+# Scale the deployment
+kubectl scale deployment order-service -n maip-services --replicas=12
 
 # Verify scaling
 kubectl get pods -n maip-services -l app=order-service
 
 # Check HPA status
-kubectl get hpa order-service-hpa -n maip-services
+kubectl get hpa -n maip-services
 ```
 
 The difference: actual deployment names, actual namespaces, actual label selectors. Copilot pattern-matches against these when generating suggestions.
@@ -68,17 +77,17 @@ The difference: actual deployment names, actual namespaces, actual label selecto
 
 We have dozens of instruction files, but three made the biggest immediate impact:
 
-**1. `instructions/aws/eks-emergency-scaling.md`**
+**1. `instructions/aws/eks-cluster.md`**
 
-Contains every emergency scaling command with correct resource names. When the 3 AM alert fires, the on-call engineer types "scale order processing" and gets executable commands, not documentation to read.
+Contains every EKS command with correct resource names. When the 3 AM alert fires, the on-call engineer types "scale order processing" and gets executable commands, not documentation to read.
 
 **2. `instructions/microservices/pricing-engine-service.md`**
 
 Our pricing engine uses Drools rules. This file contains the fact object names, method signatures, and rule patterns. When adding a new discount rule, Copilot generates syntactically correct Drools—not generic Java.
 
-**3. `instructions/deployment/deploy-qa.md`**
+**3. `instructions/deployment/environments.md`**
 
-QA environment spinup in one shot. The file contains the exact sequence: networking first, then database, then Kafka topics, then EKS deployments. Copilot suggests the whole orchestrated workflow.
+QA environment deployment in one shot. The file contains the exact sequence: set profile, configure kubectl, apply manifests, verify. Copilot suggests the whole orchestrated workflow.
 
 ---
 
@@ -88,19 +97,45 @@ Before instructions:
 ```bash
 # Developer types: "deploy pricing engine to QA"
 # Copilot suggests: kubectl apply -f deployment.yaml
-# Useless. Which deployment.yaml? Which namespace? Which context?
+# Useless. Which deployment.yaml? Which namespace? Which cluster?
 ```
 
 After adding deployment instructions:
 ```bash
 # Developer types: "deploy pricing engine to QA"
 # Copilot suggests:
-maip-qa && kubectl apply -f DevOps/Kubernetes/services/pricing-engine/ -n maip-services
+
+# Set QA environment
+export AWS_PROFILE=maip-qa AWS_REGION=us-east-1 MAIP_ENV=qa
+
+# Configure kubectl for QA cluster
+aws eks update-kubeconfig --name maip-qa-eks-cluster
+
+# Deploy
+kubectl apply -f DevOps/Kubernetes/services/pricing-engine/ -n maip-services
+
+# Verify deployment
 kubectl rollout status deployment/pricing-engine-service -n maip-services
+
+# Watch logs
 kubectl logs -f -l app=pricing-engine-service -n maip-services --tail=50
 ```
 
-Deploy, verify, watch logs. In one suggestion. With correct paths and namespaces.
+Set environment, connect to cluster, deploy, verify, watch logs. In one suggestion. With correct paths and namespaces.
+
+---
+
+## How It Works in Practice
+
+When you add instruction files to your repo, Copilot reads them as context. Here's the flow:
+
+1. **You type a comment** in your terminal, IDE, or Copilot Chat: `# deploy pricing engine to QA`
+
+2. **Copilot searches your instructions** for relevant patterns (it finds "QA", "pricing-engine", "deploy")
+
+3. **Copilot generates commands** using your specific resource names, not generic placeholders
+
+The key insight: Copilot doesn't execute commands. It *suggests* commands based on your instruction patterns. You review and run them in your actual terminal.
 
 ---
 
@@ -108,7 +143,7 @@ Deploy, verify, watch logs. In one suggestion. With correct paths and namespaces
 
 Pick the one thing that causes the most friction on your team. For us, it was Kafka operations—checking lag, resetting offsets, creating topics.
 
-Create `instructions/aws/kafka-operations.md` (or whatever matches your setup). Add the five commands your team runs most often, with your actual resource names.
+Create `instructions/aws/msk-kafka.md` (or whatever matches your setup). Add the five commands your team runs most often, with your actual resource names.
 
 Push it. Wait for the first "how did Copilot know that?" from a teammate.
 
@@ -117,4 +152,4 @@ That's the moment everything changes.
 ---
 
 **Full repository with all instruction files:**  
-[github.com/javakishore-veleti/Merchant-Application-Intelligence-Platform/instructions/](https://github.com/javakishore-veleti/Merchant-Application-Intelligence-Platform/instructions/)
+[github.com/javakishore-veleti/Merchant-Application-Intelligence-Platform/tree/main/instructions](https://github.com/javakishore-veleti/Merchant-Application-Intelligence-Platform/tree/main/instructions)
