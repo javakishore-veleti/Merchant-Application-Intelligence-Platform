@@ -10,8 +10,6 @@
 
 **MAIP** is an enterprise-grade Merchant Banking Customer Onboarding Platform for Point-of-Sale (PoS) terminal sales. Built on the **Streaming Intelligence Framework (SIF)** principles, it combines event-driven microservices, real-time data pipelines, and LLMOps-enabled observability to deliver a secure, scalable, and intelligent merchant onboarding experience.
 
-This implementation is based on the IEEE research paper: *"Streaming Intelligence: Securing, Scaling and Observing Cloud-Native Data Pipelines with LLMOps"* (IEEE ICCED 2025).
-
 ## Architecture
 
 ### System Architecture
@@ -433,7 +431,7 @@ Open any instruction file in IntelliJ IDEA, VS Code, or PyCharm. When you type c
 | staging | `maip-staging` | us-east-1 | us-west-2 | Pre-production |
 | prod | `maip-prod` | us-east-1 | us-west-2 | Production |
 
-## Key Metrics (From SIF Research)
+## Key Metrics
 
 | Metric | Baseline | With SIF | Improvement |
 |--------|----------|----------|-------------|
