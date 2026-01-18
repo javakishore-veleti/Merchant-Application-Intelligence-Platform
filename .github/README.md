@@ -431,7 +431,7 @@ Open any instruction file in IntelliJ IDEA, VS Code, or PyCharm. When you type c
 | staging | `maip-staging` | us-east-1 | us-west-2 | Pre-production |
 | prod | `maip-prod` | us-east-1 | us-west-2 | Production |
 
-## Key Metrics (From SIF Research)
+## Key Metrics
 
 | Metric | Baseline | With SIF | Improvement |
 |--------|----------|----------|-------------|
